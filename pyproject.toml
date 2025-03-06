@@ -1,0 +1,30 @@
+[project]
+name = "python-learn"
+version = "0.1.0-alpha"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+license = {text = "ISC"}
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+]
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 99
+
+#[tool.pyright]
+#venvPath = "."
+#venv = ".venv"
+
+
+[tool.poetry.group.dev.dependencies]
+yapf = "^0.43.0"
+pytest = "^8.3.4"
+quarry = "^1.9.6"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
