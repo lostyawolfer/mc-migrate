@@ -1,10 +1,11 @@
 from mcuuid import *
+from mcuuid import _parse_name
 import unittest
 # @unittest.expectedFailure
 
 
 class UUIDTestCase(unittest.TestCase):
-    def test_uuid(self):
+    def test_uuid_offline(self):
         # test uuids calculated by https://minecraft.wiki/w/Calculators/Player_UUID
         # test uuid arrays calculated by https://www.soltoder.com/mc-uuid-converter/
         test_names = ['Lostya', 'Provektork', 'MrOmega', 'N1llKigg8rs']
@@ -15,6 +16,36 @@ class UUIDTestCase(unittest.TestCase):
             uu = PlayerUUID(username=name, is_offline=True)
             assert uu.hyphenated() == uuid
             assert list(uu.intparts()) == list(parts)
+    
+    @unittest.skip('reduce load on server')
+    def test_uuid_online(self):
+        names = {
+            'Lostya': '6d88dcec-dd3a-475a-ba3b-544846a54cfa',
+            'Provektork': '58d92483-a00b-40b2-bf18-dd3875d93410'
+        }
+        
+        for name, exp_uuid in names.items():
+            uu = PlayerUUID(username=name, is_offline=False)
+            assert uu.hyphenated() == exp_uuid
+        
+        nonexistent = ['Lostya32843123123123', '=====']
+        for name in nonexistent:
+            with self.assertRaises(NotFoundError):
+                uu = PlayerUUID(username=name, is_offline=False)
+
+
+    def test_parse_username(self):
+        opts = ['online:Lostya', 'offline:Provektork', 'Lostya']
+        exps = [('Lostya', False), ('Provektork', True), ('Lostya', True)]
+
+        for arg, exp in zip(opts, exps):
+            res = _parse_name(arg)
+            assert res == exp
+
+        errs = [':Lostya', '', 'offline:']
+        for err in errs:
+            with self.assertRaises(Exception):
+                res = _parse_name(err)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,9 +1,17 @@
+from dataclasses import dataclass
 import enum
 import functools
 import hashlib
 import json
+import nbtlib       # foreign
+import pathlib as pth
+import shutil
 from typing import Optional
 from urllib import request
+from urllib.error import HTTPError
+
+class NotFoundError(Exception):
+    pass
 
 class HashVariant(enum.IntEnum):
     """
@@ -106,8 +114,13 @@ class PlayerUUID(MCUUID):
         }
 
         req = request.Request(url=url, headers=headers)
-        with request.urlopen(req) as conn:
-            jsondata = conn.read()
+        try:
+            with request.urlopen(req) as conn:
+                jsondata = conn.read()
+        except HTTPError as exc:
+            if exc.code == 404:
+                raise NotFoundError(username)
+            raise exc
         
         data = json.loads(jsondata)
         uuid = data['id']
@@ -118,6 +131,159 @@ class PlayerUUID(MCUUID):
         return f'<{n}: {self.hyphenated()}, offline={self.is_offline}>'
 
 
+def _parse_name(username: str, *, def_is_offline=True) -> tuple[str, bool]:
+    """
+    Returns a tuple of a form: (username, is_online)
+    is_offline defaults to def_is_offline
+    """
+
+    parts = username.split(':', maxsplit=1)
+    assert all(parts)       # none of parts is empty
+
+    if len(parts) < 2:
+        return parts[0], def_is_offline
+    
+    kind, name = parts
+    kind = kind.lower()
+    assert kind in ['offline', 'online'], 'kind must be "offline" or "online"'
+    is_offline = (kind == 'offline')
+    return name, is_offline
+
+
+class ServerJson:
+    file: pth.Path
+    _parsed: list
+
+    def __init__(self, file: pth.Path | str):
+        self.file = pth.Path(file)
+        assert self.file.is_file()
+
+        # load
+        with open(file, 'rb') as f:
+            self._parsed = json.load(f)
+    
+    def rename_player(self, oldname: str, newname: str, is_new_offline: bool):
+        for player in self._parsed:
+            if player['name'] != oldname:
+                continue        # continue search
+            # found
+            uu = PlayerUUID(username=newname, is_offline=is_new_offline)
+            player['uuid'] = uu.hyphenated()
+            player['name'] = newname
+            return player['uuid']
+        # not found
+        raise NotFoundError('Player', oldname)
+    
+    def write(self, is_backup: bool=True):
+        if is_backup:
+            bkp = self.file.with_suffix(self.file.suffix + '.bak')
+            shutil.copy2(self.file, bkp)
+        with open(self.file, 'w') as f:
+            json.dump(self._parsed, f)
+
+
+def rename_server(oldname: str, newname: str, *, server_dir: pth.Path | str, is_backup: bool=True):
+    server_dir = pth.Path(server_dir)
+    assert server_dir.is_dir()
+
+    oldname, _ = _parse_name(oldname)
+    newname, newoffline = _parse_name(newname)
+
+    server_files = 'whitelist.json', 'usercache.json', 'ops.json', 'banned-players.json'
+    nrenames = []
+    for file in server_files:
+        j = ServerJson(server_dir.joinpath(file))
+        try:
+            j.rename_player(oldname=oldname, newname=newname, is_new_offline=newoffline)
+        except NotFoundError:
+            pass
+        else:
+            j.write(is_backup=is_backup)
+            nrenames.append(file)
+    if not nrenames:
+        raise NotFoundError('Player', oldname)
+    return nrenames
+
+
+def rename(oldname: str, newname: str, *, world_dir: pth.Path | str, is_backup: bool=True):
+    """
+    oldname and newname must have format:
+        'offline:PlayerName' or
+        'online:PlayerName'
+    When neither 'offline' or 'online' is given, 'offline' is assumed
+    """
+    bkp_fmt = '{orig}.{oldname}->{newname}.{newuuid}.bak'
+
+    world_dir = pth.Path(world_dir)     # ensure
+    assert world_dir.is_dir(), 'dir must be a directory'
+
+    oldname, oldoffline = _parse_name(oldname)
+    newname, newoffline = _parse_name(newname)
+    assert not (oldoffline is False and newoffline is False), 'on->on is not sane'
+
+    olduuid = PlayerUUID(username=oldname, is_offline=oldoffline)
+    newuuid = PlayerUUID(username=newname, is_offline=newoffline)
+
+    paths = ['playerdata/{uuid}.dat', 'playerdata/{uuid}.dat_old',
+             'stats/{uuid}.json', 'advancements/{uuid}.json']
+    paths_dirs = [world_dir.joinpath(p).parent for p in paths]
+    assert all([p.is_dir() for p in paths_dirs]), 'dir structure mismatch'
+
+    changed = []
+    for path in paths:
+        filename = path.format(uuid=olduuid.hyphenated())
+        file = world_dir.joinpath(filename)
+        if not file.exists():
+            continue
+        
+        if is_backup:       # backup first
+            newf = bkp_fmt.format(
+                orig=file.name, oldname=oldname, newname=newname,
+                newuuid=newuuid.hyphenated()
+            )
+            shutil.copy2(file, file.with_name(newf))
+        
+        newfile = file.rename(file.with_stem(newuuid.hyphenated()))
+        changed.append(newfile)
+
+        if file.suffix != '.dat':
+            continue
+
+        # apply changes inside dat
+        with nbtlib.load(newfile) as nbt:
+            nbt['UUID'] = nbtlib.IntArray(list(newuuid.intparts()))
+            nbt.save()
+    return changed
+
+def _get_world_name(serverprops):
+    with open(serverprops) as f:
+        props = list(f)
+    for prop in props:
+        prop = prop.strip()
+        if not prop.startswith('level-name='):
+            continue
+        name = prop[len('level-name='):]
+        return name
+
+def full_rename(oldname: str, newname: str, *,
+                server_root: pth.Path | str,
+                world_name: Optional[str]=None,
+                is_backup: bool=True):
+    server_root = pth.Path(server_root)
+    assert server_root.is_dir()
+
+    if world_name is None:
+        world_name = _get_world_name(server_root.joinpath('server.properties'))
+
+    world_dir = server_root.joinpath(world_name)    # type: ignore
+
+    # TODO: output files after rename
+    changed = rename(oldname=oldname, newname=newname, world_dir=world_dir, is_backup=is_backup)
+    try:
+        changed += rename_server(oldname=oldname, newname=newname, server_dir=server_root, is_backup=is_backup)
+    except NotFoundError:
+        pass
+    return changed
 
 if __name__ == '__main__':
     val = 0b11001110
