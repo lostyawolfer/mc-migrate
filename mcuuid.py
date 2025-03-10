@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from dataclasses import dataclass
 import enum
 import functools
@@ -6,6 +8,7 @@ import json
 import nbtlib       # foreign
 import pathlib as pth
 import shutil
+import sys
 from typing import Optional
 from urllib import request
 from urllib.error import HTTPError
@@ -285,9 +288,86 @@ def full_rename(oldname: str, newname: str, *,
         pass
     return changed
 
-if __name__ == '__main__':
-    val = 0b11001110
 
-    # for variant in list(HashVariant):
-    #     tonull = (0xFF >> variant + 1) | 0xFF >> 3
-    #     print(variant, '{:0>8}'.format(bin(tonull)[2:]))
+def main(progname: str, *args):
+    progname = pth.Path(progname).name
+
+    print(progname, args)
+    import argparse
+    import errno
+
+    parser = argparse.ArgumentParser(
+        prog=progname,
+
+    )
+
+    world_group = parser.add_mutually_exclusive_group()
+    world_group.add_argument('-w', '--world',
+        action='store', default=None,
+        help='Name of the world directory (leave empty to retreive from server.properties)'
+    )
+
+    # world_group.add_argument('-W', '--world-dir',
+    #     action='store', default=None, type=pth.Path,
+    #     help='Absolute path to the world directory'
+    # )
+
+    parser.add_argument('-s', '--server-dir',
+        action='store', default='.', type=pth.Path,
+        help='Absolute path to server root directory'
+    )
+
+    parser.add_argument('--no-backup', dest='backup',
+        action='store_false',
+        help='Flag indicating no backups should be done'
+    )
+
+    parser.add_argument('-C', '--clear-backups', dest='cleanup',
+        action='store_true',
+        help='Clean directories, removing all backups'
+    )
+
+    _form = 'offline:PlayerName or online:PlayerName or just PlayerName (offline is assumed)'
+    parser.add_argument('oldname', nargs='?',
+        default=None,
+        help=f'Current player name in form of {_form}'
+    )
+
+    parser.add_argument('newname', nargs='?',
+        default=None,
+        help=f'New player name in form of {_form}'
+    )
+
+    
+    opt = parser.parse_args(args)
+
+    if opt.cleanup and ((opt.oldname is not None) or (opt.newname is not None)):
+        print('For cleanup action no names must be provided', file=sys.stderr)
+        exit(errno.EINVAL)
+    if not opt.cleanup and (opt.oldname is None or opt.newname is None):
+        print('Both names must be provided', file=sys.stderr)
+        exit(errno.EINVAL)
+
+    print('Parsed', vars(opt))
+
+    make_rename = lambda: full_rename(
+        oldname=opt.oldname, newname=opt.newname,
+        server_root=opt.server_dir,
+        world_name=opt.world,
+        is_backup=opt.backup
+    )
+    
+    make_cleanup = lambda: print('TODO: add cleanup')
+    
+    if not opt.cleanup:
+        renamed = make_rename()
+        renamed = list(map(str, renamed))
+        msg = 'Renamed files:\n\t' + '\n\t'.join(renamed)
+        print(msg)
+    else:
+        make_cleanup()
+        
+    
+
+if __name__ == '__main__':
+    main(*sys.argv)
