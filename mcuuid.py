@@ -192,10 +192,11 @@ def rename_server(oldname: str, newname: str, *, server_dir: pth.Path | str, is_
     oldname, _ = _parse_name(oldname)
     newname, newoffline = _parse_name(newname)
 
-    server_files = 'whitelist.json', 'usercache.json', 'ops.json', 'banned-players.json'
+    server_files = [server_dir.joinpath(name) for name in 
+        ['whitelist.json', 'usercache.json', 'ops.json', 'banned-players.json']]
     nrenames = []
     for file in server_files:
-        j = ServerJson(server_dir.joinpath(file))
+        j = ServerJson(file)
         try:
             j.rename_player(oldname=oldname, newname=newname, is_new_offline=newoffline)
         except NotFoundError:
@@ -289,16 +290,57 @@ def full_rename(oldname: str, newname: str, *,
     return changed
 
 
+def cleanup(server_dir: str | pth.Path, worldname: Optional[str]=None):
+    server_dir = pth.Path(server_dir)
+    assert server_dir.is_dir()
+
+    if worldname is None:
+        worldname = _get_world_name(server_dir.joinpath('server.properties'))
+    
+    world_dir = server_dir.joinpath(worldname)  # type: ignore
+
+    subdirs = [server_dir]
+    subdirs += [world_dir.joinpath(i) for i in [
+        'playerdata', 'stats', 'advancements']]
+
+    removed = []
+    for subdir in subdirs:
+        for file in subdir.glob('*.bak'):
+            removed.append(file)
+            file.unlink()
+    
+    return removed
+
+
+def _main_process(parsed_args):
+    opt = parsed_args
+    if not opt.cleanup:     # make: rename player
+        processed = full_rename(
+            oldname=opt.oldname, newname=opt.newname,
+            server_root=opt.server_dir,
+            world_name=opt.world,
+            is_backup=opt.backup
+        )
+        sup = ' (everything backed up)' if opt.backup else ''
+        msg = f'Affected files{sup}:\n\t'
+    else:                   # make: cleanup
+        processed = cleanup(server_dir=opt.server_dir, worldname=opt.world)
+        msg = 'Removed backups:\n\t'
+    
+    print(processed)
+    processed = [file.relative_to(opt.server_dir.parent) for file in processed]
+    msg += '\n\t'.join(map(str, processed))
+    print(msg)
+
+
 def main(progname: str, *args):
     progname = pth.Path(progname).name
 
-    print(progname, args)
     import argparse
     import errno
 
     parser = argparse.ArgumentParser(
         prog=progname,
-
     )
 
     world_group = parser.add_mutually_exclusive_group()
@@ -341,32 +383,24 @@ def main(progname: str, *args):
     
     opt = parser.parse_args(args)
 
+    err = None
     if opt.cleanup and ((opt.oldname is not None) or (opt.newname is not None)):
-        print('For cleanup action no names must be provided', file=sys.stderr)
-        exit(errno.EINVAL)
+        err = 'For cleanup action no names must be provided'
     if not opt.cleanup and (opt.oldname is None or opt.newname is None):
-        print('Both names must be provided', file=sys.stderr)
+        err = 'Both names must be provided'
+        
+    if err:
+        msg = f'ERROR: {err}\nSee {progname} --help for details'
+        print(msg, file=sys.stderr)
         exit(errno.EINVAL)
 
-    print('Parsed', vars(opt))
+    #print('Parsed', vars(opt))
 
-    make_rename = lambda: full_rename(
-        oldname=opt.oldname, newname=opt.newname,
-        server_root=opt.server_dir,
-        world_name=opt.world,
-        is_backup=opt.backup
-    )
-    
-    make_cleanup = lambda: print('TODO: add cleanup')
-    
-    if not opt.cleanup:
-        renamed = make_rename()
-        renamed = list(map(str, renamed))
-        msg = 'Renamed files:\n\t' + '\n\t'.join(renamed)
-        print(msg)
-    else:
-        make_cleanup()
-        
+    try:
+        _main_process(opt)
+    except Exception as exc:
+        print(f'ERROR {type(exc).__name__}: {str(exc)}', file=sys.stderr)
+        exit(code=1)
     
 
 if __name__ == '__main__':
