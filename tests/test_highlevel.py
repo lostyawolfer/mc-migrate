@@ -94,3 +94,6 @@ class HighLevelTest(unittest.TestCase):
     def test_server_dir(self):
         with self.assertRaises(Exception):
             self.main(server_dir=TEST_WRONG_PATH)
+        
+    def test_string_args(self):
+        ...
