@@ -327,10 +327,11 @@ def _main_process(parsed_args):
         processed = cleanup(server_dir=opt.server_dir, worldname=opt.world)
         msg = 'Removed backups:\n\t'
     
-    print(processed)
-    processed = [file.relative_to(opt.server_dir.parent) for file in processed]
-    msg += '\n\t'.join(map(str, processed))
-    print(msg)
+    if not opt.quiet:
+        print(processed)
+        processed = [file.relative_to(opt.server_dir.parent) for file in processed]
+        msg += '\n\t'.join(map(str, processed))
+        print(msg)
 
 
 def main(progname: str, *args):
@@ -353,6 +354,11 @@ def main(progname: str, *args):
     #     action='store', default=None, type=pth.Path,
     #     help='Absolute path to the world directory'
     # )
+
+    parser.add_argument('-q', '--quiet',
+        action='store', default='.', type=pth.Path,
+        help='Do not show any messages'
+    )
 
     parser.add_argument('-s', '--server-dir',
         action='store', default='.', type=pth.Path,
@@ -382,25 +388,26 @@ def main(progname: str, *args):
 
     
     opt = parser.parse_args(args)
-
-    err = None
-    if opt.cleanup and ((opt.oldname is not None) or (opt.newname is not None)):
-        err = 'For cleanup action no names must be provided'
-    if not opt.cleanup and (opt.oldname is None or opt.newname is None):
-        err = 'Both names must be provided'
-        
-    if err:
-        msg = f'ERROR: {err}\nSee {progname} --help for details'
-        print(msg, file=sys.stderr)
-        exit(errno.EINVAL)
-
     #print('Parsed', vars(opt))
 
+    err = None
+    errnum = None
+    if opt.cleanup and ((opt.oldname is not None) or (opt.newname is not None)):
+        err, errnum = 'For cleanup action no names must be provided', errno.EINVAL
+    if not opt.cleanup and (opt.oldname is None or opt.newname is None):
+        err, errnum = 'Both names must be provided', errno.EINVAL
+    
+
     try:
-        _main_process(opt)
+        _main_process(parsed_args=opt)
     except Exception as exc:
-        print(f'ERROR {type(exc).__name__}: {str(exc)}', file=sys.stderr)
-        exit(code=1)
+        err, errnum = f'{type(exc).__name__}: {str(exc)}', 1
+
+
+    if err:
+        msg = f'ERROR: {err}\nSee {progname} --help for details'
+        raise Exception(msg, errnum)
+    
     
 
 if __name__ == '__main__':
