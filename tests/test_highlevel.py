@@ -2,8 +2,9 @@ import unittest
 import pathlib as pth
 import subprocess as sp
 from types import SimpleNamespace
-import mcuuid
-from mcuuid import _main_process
+import mc_migrator
+from mc_migrator import mcmigrator
+from mc_migrator.mcmigrator import _main_process
 # from mcuuid import main as mcmain
 
 import os
@@ -103,7 +104,7 @@ class HighLevelTest(unittest.TestCase):
 
 class CmdTest(unittest.TestCase):
     def cmd(self, args):
-        proc = pth.Path(mcuuid.__file__)      # path to script
+        proc = pth.Path(mcmigrator.__file__)      # path to script
 
         args = [str(proc)] + list(args)
         res = sp.run(args, capture_output=True, text=True, check=True)

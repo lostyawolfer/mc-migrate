@@ -1,16 +1,31 @@
 [project]
-name = "python-learn"
+name = "mc-migrate"
 version = "0.1.0-alpha"
-description = ""
+description = "Minecraft Player Migrator"
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "lostyawolfer",email = "lostyawolfer@gmail.com"}
 ]
 license = {text = "ISC"}
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
-dependencies = [
-    "nbtlib (>=2.0.4,<3.0.0)"
-]
+
+[project.urls]
+homepage = "https://github.com/lostyawolfer/mc-migrate"
+repository = "https://github.com/lostyawolfer/mc-migrate"
+documentation = "https://github.com/lostyawolfer/mc-migrate?tab=readme-ov-file"
+"Bug Tracker" = "https://github.com/lostyawolfer/mc-migrate/issues"
+
+[project.scripts]
+mc-migrate = 'mc_migrate.mcmigrate:main'
+
+[tool.poetry.group.main.dependencies]
+nbtlib = ">=2.0.4,<3.0.0"
+
+[tool.poetry.group.dev.dependencies]
+yapf = "^0.43.0"
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+
 
 [tool.coverage.run]
 branch = true
@@ -29,13 +44,6 @@ column_limit = 99
 #[tool.pyright]
 #venvPath = "."
 #venv = ".venv"
-
-
-[tool.poetry.group.dev.dependencies]
-yapf = "^0.43.0"
-pytest = "^8.3.4"
-quarry = "^1.9.6"
-pytest-cov = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

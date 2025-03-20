@@ -334,7 +334,8 @@ def _main_process(parsed_args):
         print(msg)
 
 
-def main(progname: str, *args):
+def main():
+    progname, *args = sys.argv
     progname = pth.Path(progname).name
 
     import argparse
@@ -411,4 +412,4 @@ def main(progname: str, *args):
     
 
 if __name__ == '__main__':
-    main(*sys.argv)
+    main()

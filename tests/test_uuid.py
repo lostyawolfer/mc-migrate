@@ -1,5 +1,5 @@
-from mcuuid import *
-from mcuuid import _parse_name
+from mc_migrator import *
+from mc_migrator.mcmigrator import _parse_name
 import unittest
 # @unittest.expectedFailure
 
