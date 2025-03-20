@@ -1,5 +1,5 @@
-from mc_migrator import *
-from mc_migrator.mcmigrator import _parse_name
+from mc_migrate import *
+from mc_migrate.mcmigrate import _parse_name
 import unittest
 # @unittest.expectedFailure
 

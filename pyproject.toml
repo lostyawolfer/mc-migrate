@@ -8,6 +8,12 @@ authors = [
 license = {text = "ISC"}
 readme = "README.md"
 requires-python = ">=3.13,<4.0"
+keywords = [ 
+    "Minecraft", "MC", "Player", "Migrate", "Migration", "Migrator", "UUID",
+    "PaperMC"
+]
+dynamic = [ "classifiers" ]
+
 
 [project.urls]
 homepage = "https://github.com/lostyawolfer/mc-migrate"
@@ -17,6 +23,15 @@ documentation = "https://github.com/lostyawolfer/mc-migrate?tab=readme-ov-file"
 
 [project.scripts]
 mc-migrate = 'mc_migrate.mcmigrate:main'
+
+[tool.poetry]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Games/Entertainment",
+    "Topic :: Utilities"
+]
 
 [tool.poetry.group.main.dependencies]
 nbtlib = ">=2.0.4,<3.0.0"
