@@ -12,6 +12,16 @@ dependencies = [
     "nbtlib (>=2.0.4,<3.0.0)"
 ]
 
+[tool.coverage.run]
+branch = true
+data_file = ".coverage/.coverage"
+
+[tool.coverage.html]
+directory = ".coverage/html"
+
+[tool.coverage.lcov]
+output = ".coverage/coverage.lcov"
+
 [tool.yapf]
 based_on_style = "pep8"
 column_limit = 99
@@ -25,6 +35,7 @@ column_limit = 99
 yapf = "^0.43.0"
 pytest = "^8.3.4"
 quarry = "^1.9.6"
+pytest-cov = "^6.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
